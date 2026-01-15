@@ -1,0 +1,211 @@
+# TradingAgents Docker Compose Configuration
+# Supports both US and Vietnam stock markets with vnstock integration
+#
+# Usage:
+#   Development:   docker-compose up --build
+#   Production:    docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Vietnam market: TRADINGAGENTS_MARKET=vn docker-compose up
+#
+# Environment variables should be set in .env file (see .env.example)
+
+services:
+  # =========================================================================
+  # Main TradingAgents Application
+  # =========================================================================
+  tradingagents:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tradingagents
+    restart: unless-stopped
+
+    # Environment variables for API keys and configuration
+    environment:
+      # LLM API Keys (required - set in .env file)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+
+      # Data Provider API Keys (optional - based on data_vendors config)
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY:-}
+      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
+      - EODHD_API_KEY=${EODHD_API_KEY:-}
+
+      # Market Configuration
+      # Options: "us" (US market), "vn" (Vietnam market - HOSE, HNX, UPCOM)
+      - TRADINGAGENTS_MARKET=${TRADINGAGENTS_MARKET:-vn}
+
+      # LLM Provider and Model Configuration
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - DEEP_THINK_LLM=${DEEP_THINK_LLM:-gpt-4o-mini}
+      - QUICK_THINK_LLM=${QUICK_THINK_LLM:-gpt-4o-mini}
+
+      # Application directories (mapped to volumes)
+      - TRADINGAGENTS_RESULTS_DIR=/data/results
+      - TRADINGAGENTS_CACHE_DIR=/cache
+
+      # Python settings
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+
+      # Redis connection (for caching - optional)
+      - REDIS_URL=redis://redis:6379/0
+
+      # Timezone for Vietnam market
+      - TZ=Asia/Ho_Chi_Minh
+
+    # Volume mounts for data persistence
+    volumes:
+      # Results directory - stores trading decisions and logs
+      - tradingagents_results:/data/results
+
+      # Cache directory - stores API response cache to reduce calls
+      - tradingagents_cache:/cache
+
+      # Development: mount source code for live reload (uncomment for dev)
+      # - ./tradingagents:/app/tradingagents:ro
+      # - ./cli:/app/cli:ro
+
+    # Networking
+    networks:
+      - tradingagents_network
+
+    # Dependencies
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    # Health check for container orchestration
+    healthcheck:
+      test: ["CMD", "python", "-c", "import tradingagents; print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Resource limits (adjust based on your server capacity)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # =========================================================================
+  # Redis Cache (Optional - for API response caching)
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: tradingagents_redis
+    restart: unless-stopped
+
+    # Redis configuration for caching
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+
+    # Volume for cache persistence
+    volumes:
+      - redis_data:/data
+
+    # Networking
+    networks:
+      - tradingagents_network
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # =========================================================================
+  # ChromaDB Vector Database (Optional - for memory/RAG features)
+  # =========================================================================
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: tradingagents_chromadb
+    restart: unless-stopped
+
+    # ChromaDB configuration
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+
+    # Volume for vector database persistence
+    volumes:
+      - chromadb_data:/chroma/chroma
+
+    # Networking
+    networks:
+      - tradingagents_network
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+# =========================================================================
+# Named Volumes for Data Persistence
+# =========================================================================
+volumes:
+  # Trading results and decision logs
+  tradingagents_results:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/results
+
+  # API response cache
+  tradingagents_cache:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/cache
+
+  # Redis cache data
+  redis_data:
+    driver: local
+
+  # ChromaDB vector store
+  chromadb_data:
+    driver: local
+
+# =========================================================================
+# Network Configuration
+# =========================================================================
+networks:
+  tradingagents_network:
+    driver: bridge
+    name: tradingagents_network

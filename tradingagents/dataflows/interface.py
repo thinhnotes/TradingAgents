@@ -16,6 +16,15 @@ from .alpha_vantage import (
     get_news as get_alpha_vantage_news
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError
+from .vnstock import (
+    get_vnstock_data,
+    get_vnstock_balance_sheet,
+    get_vnstock_cashflow,
+    get_vnstock_income_statement,
+    get_vnstock_financial_ratios,
+    get_vnstock_indicators,
+)
+from .vn_news import get_vn_stock_news, get_vn_global_news
 
 # Configuration and routing logic
 from .config import get_config
@@ -58,7 +67,8 @@ VENDOR_LIST = [
     "local",
     "yfinance",
     "openai",
-    "google"
+    "google",
+    "vnstock",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -68,32 +78,38 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
         "local": get_YFin_data,
+        "vnstock": get_vnstock_data,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
-        "local": get_stock_stats_indicators_window
+        "local": get_stock_stats_indicators_window,
+        "vnstock": get_vnstock_indicators,
     },
     # fundamental_data
     "get_fundamentals": {
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "openai": get_fundamentals_openai,
+        "vnstock": get_vnstock_financial_ratios,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
         "local": get_simfin_balance_sheet,
+        "vnstock": get_vnstock_balance_sheet,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
         "local": get_simfin_cashflow,
+        "vnstock": get_vnstock_cashflow,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
         "local": get_simfin_income_statements,
+        "vnstock": get_vnstock_income_statement,
     },
     # news_data
     "get_news": {
@@ -101,10 +117,12 @@ VENDOR_METHODS = {
         "openai": get_stock_news_openai,
         "google": get_google_news,
         "local": [get_finnhub_news, get_reddit_company_news, get_google_news],
+        "vnstock": get_vn_stock_news,
     },
     "get_global_news": {
         "openai": get_global_news_openai,
-        "local": get_reddit_global_news
+        "local": get_reddit_global_news,
+        "vnstock": get_vn_global_news,
     },
     "get_insider_sentiment": {
         "local": get_finnhub_company_insider_sentiment
