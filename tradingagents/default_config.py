@@ -7,6 +7,8 @@ DEFAULT_CONFIG = {
         os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
         "dataflows/data_cache",
     ),
+    # Market configuration
+    "market": os.getenv("TRADINGAGENTS_DEFAULT_MARKET", "US"),
     # LLM settings
     "llm_provider": "openai",
     "deep_think_llm": "gpt-5.4",
