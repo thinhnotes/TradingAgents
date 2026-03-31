@@ -1,5 +1,6 @@
 from typing import Optional
 import datetime
+import os
 import typer
 from pathlib import Path
 from functools import wraps
@@ -28,6 +29,7 @@ from tradingagents.default_config import DEFAULT_CONFIG
 from cli.models import AnalystType
 from cli.utils import *
 from cli.announcements import fetch_announcements, display_announcements
+from tradingagents.dataflows.market_config import SUPPORTED_MARKETS, get_market_metadata
 from cli.stats_handler import StatsCallbackHandler
 
 console = Console()
@@ -459,6 +461,30 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
     layout["footer"].update(Panel(stats_table, border_style="grey50"))
 
 
+def ask_market():
+    """Ask user to select market."""
+    import questionary
+    default_market = os.getenv("TRADINGAGENTS_DEFAULT_MARKET", "US")
+    choices = [
+        questionary.Choice(
+            title=f"US - {get_market_metadata('US')['exchange']} ({get_market_metadata('US')['currency']})",
+            value="US",
+        ),
+        questionary.Choice(
+            title=f"VN - {get_market_metadata('VN')['exchange']} ({get_market_metadata('VN')['currency']})",
+            value="VN",
+        ),
+    ]
+    # Move default to front
+    if default_market == "VN":
+        choices = choices[::-1]
+
+    return questionary.select(
+        "Select market:",
+        choices=choices,
+    ).ask()
+
+
 def get_user_selections():
     """Get all user selections before starting the analysis display."""
     # Display ASCII art welcome message
@@ -498,15 +524,32 @@ def get_user_selections():
             box_content += f"\n[dim]Default: {default}[/dim]"
         return Panel(box_content, border_style="blue", padding=(1, 2))
 
+    # Step 0: Market
+    console.print(
+        create_question_box(
+            "Step 0: Market",
+            "Select the market to analyze",
+            os.getenv("TRADINGAGENTS_DEFAULT_MARKET", "US"),
+        )
+    )
+    selected_market = ask_market()
+    console.print(f"[green]Selected market:[/green] {selected_market}")
+
     # Step 1: Ticker symbol
+    ticker_prompt = (
+        "Enter the HOSE ticker symbol (e.g., FPT, VNM, VIC, HPG, SSI)"
+        if selected_market == "VN"
+        else "Enter the exact ticker symbol to analyze, including exchange suffix when needed (examples: SPY, CNC.TO, 7203.T, 0700.HK)"
+    )
+    ticker_default = "FPT" if selected_market == "VN" else "SPY"
     console.print(
         create_question_box(
             "Step 1: Ticker Symbol",
-            "Enter the exact ticker symbol to analyze, including exchange suffix when needed (examples: SPY, CNC.TO, 7203.T, 0700.HK)",
-            "SPY",
+            ticker_prompt,
+            ticker_default,
         )
     )
-    selected_ticker = get_ticker()
+    selected_ticker = get_ticker(default=ticker_default)
 
     # Step 2: Analysis date
     default_date = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -596,6 +639,7 @@ def get_user_selections():
         anthropic_effort = ask_anthropic_effort()
 
     return {
+        "market": selected_market,
         "ticker": selected_ticker,
         "analysis_date": analysis_date,
         "analysts": selected_analysts,
@@ -611,9 +655,9 @@ def get_user_selections():
     }
 
 
-def get_ticker():
+def get_ticker(default="SPY"):
     """Get ticker symbol from user input."""
-    return typer.prompt("", default="SPY")
+    return typer.prompt("", default=default)
 
 
 def get_analysis_date():
@@ -931,6 +975,7 @@ def run_analysis():
 
     # Create config with selected research depth
     config = DEFAULT_CONFIG.copy()
+    config["market"] = selections["market"]
     config["max_debate_rounds"] = selections["research_depth"]
     config["max_risk_discuss_rounds"] = selections["research_depth"]
     config["quick_think_llm"] = selections["shallow_thinker"]
