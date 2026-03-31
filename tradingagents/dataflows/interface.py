@@ -26,6 +26,7 @@ from .alpha_vantage_common import AlphaVantageRateLimitError
 
 # Configuration and routing logic
 from .config import get_config
+from .market_config import get_market_vendors
 
 # Tools organized by category
 TOOLS_CATEGORIES = {
@@ -63,6 +64,8 @@ TOOLS_CATEGORIES = {
 VENDOR_LIST = [
     "yfinance",
     "alpha_vantage",
+    "vnstock",
+    "vietfin",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -118,9 +121,11 @@ def get_category_for_method(method: str) -> str:
 
 def get_vendor(category: str, method: str = None) -> str:
     """Get the configured vendor for a data category or specific tool method.
+    Market-aware: uses VN-specific vendors when market is VN.
     Tool-level configuration takes precedence over category-level.
     """
     config = get_config()
+    market = config.get("market", "US").upper()
 
     # Check tool-level configuration first (if method provided)
     if method:
@@ -128,11 +133,23 @@ def get_vendor(category: str, method: str = None) -> str:
         if method in tool_vendors:
             return tool_vendors[method]
 
-    # Fall back to category-level configuration
-    return config.get("data_vendors", {}).get(category, "default")
+    # For VN market, use VN-specific default vendors
+    if market == "VN":
+        vn_defaults = {
+            "core_stock_apis": "vnstock",
+            "technical_indicators": "vnstock",
+            "fundamental_data": "vnstock",
+            "news_data": "vnstock",
+        }
+        return config.get("data_vendors", {}).get(category, vn_defaults.get(category, "vnstock"))
+
+    # Fall back to category-level configuration (US market default)
+    return config.get("data_vendors", {}).get(category, "yfinance")
 
 def route_to_vendor(method: str, *args, **kwargs):
-    """Route method calls to appropriate vendor implementation with fallback support."""
+    """Route method calls to appropriate vendor implementation with market-aware fallback."""
+    config = get_config()
+    market = config.get("market", "US").upper()
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
     primary_vendors = [v.strip() for v in vendor_config.split(',')]
@@ -140,13 +157,20 @@ def route_to_vendor(method: str, *args, **kwargs):
     if method not in VENDOR_METHODS:
         raise ValueError(f"Method '{method}' not supported")
 
-    # Build fallback chain: primary vendors first, then remaining available vendors
+    # Build market-aware fallback chain
+    market_vendors = get_market_vendors(market)
     all_available_vendors = list(VENDOR_METHODS[method].keys())
+
+    # Priority: primary configured -> market-specific -> all available
     fallback_vendors = primary_vendors.copy()
+    for vendor in market_vendors:
+        if vendor not in fallback_vendors and vendor in all_available_vendors:
+            fallback_vendors.append(vendor)
     for vendor in all_available_vendors:
         if vendor not in fallback_vendors:
             fallback_vendors.append(vendor)
 
+    last_error = None
     for vendor in fallback_vendors:
         if vendor not in VENDOR_METHODS[method]:
             continue
@@ -157,6 +181,13 @@ def route_to_vendor(method: str, *args, **kwargs):
         try:
             return impl_func(*args, **kwargs)
         except AlphaVantageRateLimitError:
-            continue  # Only rate limits trigger fallback
+            last_error = f"Rate limit on {vendor}"
+            continue
+        except Exception as e:
+            last_error = f"{vendor}: {str(e)}"
+            continue  # Any error triggers fallback
 
-    raise RuntimeError(f"No available vendor for '{method}'")
+    raise RuntimeError(
+        f"No available vendor for '{method}' in market '{market}'. "
+        f"Tried: {fallback_vendors}. Last error: {last_error}"
+    )
