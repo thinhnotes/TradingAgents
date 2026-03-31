@@ -6,6 +6,8 @@ from tradingagents.agents.utils.agent_states import (
     InvestDebateState,
     RiskDebateState,
 )
+from tradingagents.dataflows.market_config import get_market_metadata
+from tradingagents.dataflows.config import get_config
 
 
 class Propagator:
@@ -51,6 +53,9 @@ class Propagator:
             "fundamentals_report": "",
             "sentiment_report": "",
             "news_report": "",
+            # Market context
+            "market": get_config().get("market", "US"),
+            "market_metadata": get_market_metadata(get_config().get("market", "US")),
         }
 
     def get_graph_args(self, callbacks: Optional[List] = None) -> Dict[str, Any]:
