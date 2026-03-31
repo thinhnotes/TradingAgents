@@ -23,6 +23,28 @@ from .alpha_vantage import (
     get_global_news as get_alpha_vantage_global_news,
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError
+from .vnstock_provider import (
+    get_stock_data as get_vnstock_stock_data,
+    get_fundamentals as get_vnstock_fundamentals,
+    get_balance_sheet as get_vnstock_balance_sheet,
+    get_cashflow as get_vnstock_cashflow,
+    get_income_statement as get_vnstock_income_statement,
+    get_insider_transactions as get_vnstock_insider_transactions,
+    get_news as get_vnstock_news,
+    get_global_news as get_vnstock_global_news,
+    get_vnindex_data,
+    get_available_tickers as get_vnstock_available_tickers,
+)
+from .vietfin_provider import (
+    get_stock_data as get_vietfin_stock_data,
+    get_fundamentals as get_vietfin_fundamentals,
+    get_balance_sheet as get_vietfin_balance_sheet,
+    get_cashflow as get_vietfin_cashflow,
+    get_income_statement as get_vietfin_income_statement,
+    get_insider_transactions as get_vietfin_insider_transactions,
+    get_news as get_vietfin_news,
+    get_global_news as get_vietfin_global_news,
+)
 
 # Configuration and routing logic
 from .config import get_config
@@ -58,6 +80,13 @@ TOOLS_CATEGORIES = {
             "get_global_news",
             "get_insider_transactions",
         ]
+    },
+    "market_data": {
+        "description": "Market index and listing data",
+        "tools": [
+            "get_vnindex_data",
+            "get_available_tickers",
+        ]
     }
 }
 
@@ -74,6 +103,8 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
+        "vnstock": get_vnstock_stock_data,
+        "vietfin": get_vietfin_stock_data,
     },
     # technical_indicators
     "get_indicators": {
@@ -84,31 +115,52 @@ VENDOR_METHODS = {
     "get_fundamentals": {
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "yfinance": get_yfinance_fundamentals,
+        "vnstock": get_vnstock_fundamentals,
+        "vietfin": get_vietfin_fundamentals,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
+        "vnstock": get_vnstock_balance_sheet,
+        "vietfin": get_vietfin_balance_sheet,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
+        "vnstock": get_vnstock_cashflow,
+        "vietfin": get_vietfin_cashflow,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
+        "vnstock": get_vnstock_income_statement,
+        "vietfin": get_vietfin_income_statement,
     },
     # news_data
     "get_news": {
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
+        "vnstock": get_vnstock_news,
+        "vietfin": get_vietfin_news,
     },
     "get_global_news": {
         "yfinance": get_global_news_yfinance,
         "alpha_vantage": get_alpha_vantage_global_news,
+        "vnstock": get_vnstock_global_news,
+        "vietfin": get_vietfin_global_news,
     },
     "get_insider_transactions": {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
+        "vnstock": get_vnstock_insider_transactions,
+        "vietfin": get_vietfin_insider_transactions,
+    },
+    # market_data (VN-specific)
+    "get_vnindex_data": {
+        "vnstock": get_vnindex_data,
+    },
+    "get_available_tickers": {
+        "vnstock": get_vnstock_available_tickers,
     },
 }
 
@@ -140,6 +192,7 @@ def get_vendor(category: str, method: str = None) -> str:
             "technical_indicators": "vnstock",
             "fundamental_data": "vnstock",
             "news_data": "vnstock",
+            "market_data": "vnstock",
         }
         return config.get("data_vendors", {}).get(category, vn_defaults.get(category, "vnstock"))
 

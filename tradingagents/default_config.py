@@ -28,13 +28,17 @@ DEFAULT_CONFIG = {
     # Data vendor configuration
     # Category-level configuration (default for all tools in category)
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+        "core_stock_apis": "yfinance",       # US: yfinance, alpha_vantage | VN: vnstock, vietfin
+        "technical_indicators": "yfinance",  # US: yfinance, alpha_vantage | VN: vnstock
+        "fundamental_data": "yfinance",      # US: yfinance, alpha_vantage | VN: vnstock, vietfin
+        "news_data": "yfinance",             # US: yfinance, alpha_vantage | VN: vnstock (Phase 5)
+        "market_data": "vnstock",            # VN-specific: vnstock
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
     },
+    # Cross-validation tolerance for comparing VN data sources
+    # 0.01 = 1% price difference threshold
+    "cross_validation_tolerance": 0.01,
 }
