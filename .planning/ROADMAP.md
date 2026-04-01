@@ -126,24 +126,19 @@ Phase 1 (Config) ──► Phase 2 (VN Data) ──► Phase 3 (Source Monitor)
 
 ## Backlog
 
-### Phase 999.1: Custom LLM Provider URL and Model Support (BACKLOG)
+### Phase 999.1: Custom LLM Provider URL and Model Support (DONE)
 
-**Goal:** Allow users to connect to any OpenAI-compatible API endpoint (e.g., cliproxyapi, LiteLLM proxy, vLLM, LocalAI) by specifying a custom base URL and arbitrary model name. Currently the system expects specific provider keys and model names from a fixed catalog — this limits users who run their own proxy or use third-party API aggregators.
+**Goal:** Allow users to connect to any OpenAI-compatible API endpoint (e.g., cliproxyapi, LiteLLM proxy, vLLM, LocalAI) by specifying a custom base URL and arbitrary model name.
 
-**Context:**
-- User needs to connect to `cliproxyapi` — an OpenAI-compatible proxy
-- Current `backend_url` config exists but is tightly coupled to provider selection
-- `model_catalog.py` restricts model choices to a known list per provider
-- Should support: custom base URL + custom model name + optional custom API key
-- CLI should offer "Custom / Other" as a provider option
+**Implementation:**
+- `factory.py` — Routes `"custom"` provider to `OpenAIClient`
+- `openai_client.py` — Handles custom base URL from config or `CUSTOM_LLM_BASE_URL` env var + `CUSTOM_API_KEY`
+- `validators.py` — Exempts `"custom"` from model validation (any model accepted)
+- `cli/utils.py` — Added "Custom (OpenAI-compatible)" option + prompts for URL, model name, API key
+- `.env.example` — Added `CUSTOM_LLM_BASE_URL` and `CUSTOM_API_KEY` vars
 
-**Requirements:** TBD
-
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (promote with /gsd-review-backlog when ready)
+**Verified:** All 4 integration tests pass (routing, validation, base_url wiring, error handling)
 
 ---
 *Roadmap created: 2026-03-31*
-*Last updated: 2026-04-01 after backlog addition*
+*Last updated: 2026-04-01 after Phase 999.1 completed*

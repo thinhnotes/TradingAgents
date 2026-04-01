@@ -137,6 +137,9 @@ def select_research_depth() -> int:
 def select_shallow_thinking_agent(provider) -> str:
     """Select shallow thinking llm engine using an interactive selection."""
 
+    if provider.lower() == "custom":
+        return _get_custom_model_name("quick")
+
     choice = questionary.select(
         "Select Your [Quick-Thinking LLM Engine]:",
         choices=[
@@ -165,6 +168,9 @@ def select_shallow_thinking_agent(provider) -> str:
 def select_deep_thinking_agent(provider) -> str:
     """Select deep thinking llm engine using an interactive selection."""
 
+    if provider.lower() == "custom":
+        return _get_custom_model_name("deep")
+
     choice = questionary.select(
         "Select Your [Deep-Thinking LLM Engine]:",
         choices=[
@@ -187,6 +193,21 @@ def select_deep_thinking_agent(provider) -> str:
 
     return choice
 
+
+def _get_custom_model_name(mode: str) -> str:
+    """Prompt user to type a custom model name."""
+    label = "quick-thinking" if mode == "quick" else "deep-thinking"
+    model = questionary.text(
+        f"Enter the {label} model name for your custom endpoint "
+        f"(e.g., gpt-4o, claude-3-sonnet, llama-3.1-70b):",
+        validate=lambda x: len(x.strip()) > 0 or "Please enter a model name.",
+        style=questionary.Style([("text", "fg:magenta"), ("highlighted", "noinherit")]),
+    ).ask()
+    if not model:
+        console.print("\n[red]No model name provided. Exiting...[/red]")
+        exit(1)
+    return model.strip()
+
 def select_llm_provider() -> tuple[str, str]:
     """Select the OpenAI api url using interactive selection."""
     # Define OpenAI api options with their corresponding endpoints
@@ -197,6 +218,7 @@ def select_llm_provider() -> tuple[str, str]:
         ("xAI", "https://api.x.ai/v1"),
         ("Openrouter", "https://openrouter.ai/api/v1"),
         ("Ollama", "http://localhost:11434/v1"),
+        ("Custom (OpenAI-compatible)", "custom"),
     ]
     
     choice = questionary.select(
@@ -220,6 +242,31 @@ def select_llm_provider() -> tuple[str, str]:
         exit(1)
     
     display_name, url = choice
+
+    # Custom provider: prompt for URL, API key
+    if url == "custom":
+        custom_url = questionary.text(
+            "Enter your custom API base URL (e.g., https://cliproxyapi.example.com/v1):",
+            validate=lambda x: (
+                x.strip().startswith("http") or "URL must start with http:// or https://"
+            ),
+            style=questionary.Style([("text", "fg:cyan"), ("highlighted", "noinherit")]),
+        ).ask()
+        if not custom_url:
+            console.print("\n[red]No URL provided. Exiting...[/red]")
+            exit(1)
+        url = custom_url.strip()
+
+        custom_key = questionary.text(
+            "Enter API key for this endpoint (or press Enter to use CUSTOM_API_KEY env var):",
+            style=questionary.Style([("text", "fg:cyan"), ("highlighted", "noinherit")]),
+        ).ask()
+        if custom_key and custom_key.strip():
+            import os
+            os.environ["CUSTOM_API_KEY"] = custom_key.strip()
+
+        display_name = "Custom"
+
     print(f"You selected: {display_name}\tURL: {url}")
 
     return display_name, url

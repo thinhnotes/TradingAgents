@@ -29,6 +29,7 @@ _PROVIDER_CONFIG = {
     "xai": ("https://api.x.ai/v1", "XAI_API_KEY"),
     "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
     "ollama": ("http://localhost:11434/v1", None),
+    "custom": (None, "CUSTOM_API_KEY"),  # base_url comes from user config
 }
 
 
@@ -58,8 +59,20 @@ class OpenAIClient(BaseLLMClient):
 
         # Provider-specific base URL and auth
         if self.provider in _PROVIDER_CONFIG:
-            base_url, api_key_env = _PROVIDER_CONFIG[self.provider]
-            llm_kwargs["base_url"] = base_url
+            default_url, api_key_env = _PROVIDER_CONFIG[self.provider]
+            # For 'custom' provider, prefer user-supplied base_url over default
+            if self.provider == "custom":
+                if self.base_url:
+                    llm_kwargs["base_url"] = self.base_url
+                elif os.environ.get("CUSTOM_LLM_BASE_URL"):
+                    llm_kwargs["base_url"] = os.environ["CUSTOM_LLM_BASE_URL"]
+                else:
+                    raise ValueError(
+                        "Custom provider requires a base_url. Set it via config "
+                        "'backend_url' or env var 'CUSTOM_LLM_BASE_URL'."
+                    )
+            else:
+                llm_kwargs["base_url"] = default_url
             if api_key_env:
                 api_key = os.environ.get(api_key_env)
                 if api_key:
