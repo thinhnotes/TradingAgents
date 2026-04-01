@@ -28,7 +28,7 @@ def get_stock_data(
     """Get OHLCV stock data for a HOSE ticker via vnstock."""
     try:
         Vnstock = _get_vnstock()
-        stock = Vnstock().stock(symbol=symbol.upper(), source='TCBS')
+        stock = Vnstock().stock(symbol=symbol.upper(), source='VCI')
         data = stock.quote.history(start=start_date, end=end_date)
 
         if data is None or data.empty:
@@ -56,7 +56,7 @@ def get_stock_data(
         csv_string = data.to_csv(index=False)
 
         header = f"# Stock data for {symbol.upper()} from {start_date} to {end_date}\n"
-        header += f"# Source: vnstock (TCBS)\n"
+        header += f"# Source: vnstock (VCI)\n"
         header += f"# Currency: VND\n"
         header += f"# Total records: {len(data)}\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
@@ -76,7 +76,7 @@ def get_fundamentals(
     """Get company fundamentals overview via vnstock."""
     try:
         Vnstock = _get_vnstock()
-        stock = Vnstock().stock(symbol=ticker.upper(), source='TCBS')
+        stock = Vnstock().stock(symbol=ticker.upper(), source='VCI')
         overview = stock.company.overview()
 
         if overview is None or (hasattr(overview, 'empty') and overview.empty):
@@ -84,7 +84,7 @@ def get_fundamentals(
 
         # Format as key-value string
         header = f"# Company Fundamentals for {ticker.upper()}\n"
-        header += f"# Source: vnstock (TCBS)\n"
+        header += f"# Source: vnstock (VCI)\n"
         header += f"# Currency: VND\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
@@ -120,7 +120,7 @@ def get_balance_sheet(
     """Get balance sheet data via vnstock."""
     try:
         Vnstock = _get_vnstock()
-        stock = Vnstock().stock(symbol=ticker.upper(), source='TCBS')
+        stock = Vnstock().stock(symbol=ticker.upper(), source='VCI')
         period = 'quarterly' if freq.lower() == 'quarterly' else 'annual'
         data = stock.finance.balance_sheet(period=period)
 
@@ -130,7 +130,7 @@ def get_balance_sheet(
         csv_string = data.to_csv(index=False)
 
         header = f"# Balance Sheet data for {ticker.upper()} ({freq})\n"
-        header += f"# Source: vnstock (TCBS)\n"
+        header += f"# Source: vnstock (VCI)\n"
         header += f"# Currency: VND\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
@@ -150,7 +150,7 @@ def get_cashflow(
     """Get cash flow data via vnstock."""
     try:
         Vnstock = _get_vnstock()
-        stock = Vnstock().stock(symbol=ticker.upper(), source='TCBS')
+        stock = Vnstock().stock(symbol=ticker.upper(), source='VCI')
         period = 'quarterly' if freq.lower() == 'quarterly' else 'annual'
         data = stock.finance.cash_flow(period=period)
 
@@ -160,7 +160,7 @@ def get_cashflow(
         csv_string = data.to_csv(index=False)
 
         header = f"# Cash Flow data for {ticker.upper()} ({freq})\n"
-        header += f"# Source: vnstock (TCBS)\n"
+        header += f"# Source: vnstock (VCI)\n"
         header += f"# Currency: VND\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
@@ -180,7 +180,7 @@ def get_income_statement(
     """Get income statement data via vnstock."""
     try:
         Vnstock = _get_vnstock()
-        stock = Vnstock().stock(symbol=ticker.upper(), source='TCBS')
+        stock = Vnstock().stock(symbol=ticker.upper(), source='VCI')
         period = 'quarterly' if freq.lower() == 'quarterly' else 'annual'
         data = stock.finance.income_statement(period=period)
 
@@ -190,7 +190,7 @@ def get_income_statement(
         csv_string = data.to_csv(index=False)
 
         header = f"# Income Statement data for {ticker.upper()} ({freq})\n"
-        header += f"# Source: vnstock (TCBS)\n"
+        header += f"# Source: vnstock (VCI)\n"
         header += f"# Currency: VND\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
@@ -245,7 +245,7 @@ def get_vnindex_data(
     """Get VNIndex composite data via vnstock."""
     try:
         Vnstock = _get_vnstock()
-        stock = Vnstock().stock(symbol='VNINDEX', source='TCBS')
+        stock = Vnstock().stock(symbol='VNINDEX', source='VCI')
         data = stock.quote.history(start=start_date, end=end_date)
 
         if data is None or data.empty:
@@ -267,7 +267,7 @@ def get_vnindex_data(
         csv_string = data.to_csv(index=False)
 
         header = f"# VNIndex Composite Data from {start_date} to {end_date}\n"
-        header += f"# Source: vnstock (TCBS)\n"
+        header += f"# Source: vnstock (VCI)\n"
         header += f"# Total records: {len(data)}\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
@@ -283,7 +283,7 @@ def get_available_tickers() -> list:
     """Get list of all available HOSE tickers via vnstock."""
     try:
         Vnstock = _get_vnstock()
-        stock = Vnstock().stock(source='TCBS')
+        stock = Vnstock().stock(source='VCI')
         listing = stock.listing.all_symbols()
 
         if listing is None or (hasattr(listing, 'empty') and listing.empty):

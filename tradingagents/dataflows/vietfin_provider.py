@@ -2,10 +2,22 @@
 
 Secondary data source for cross-validation of Vietnamese stock data.
 vietfin is imported lazily — system won't break if not installed.
+
+API reference (vietfin v0.2.x):
+  vf.equity.price.historical(symbol, start_date, end_date, interval, provider)
+  vf.equity.profile(symbol, provider)
+  vf.equity.fundamental.ratios(symbol, period, provider)
+  vf.equity.fundamental.income(symbol, period, provider)
+  vf.equity.fundamental.balance(symbol, period, provider)
+  vf.equity.fundamental.cash(symbol, period, provider)
 """
 
 from typing import Annotated
 from datetime import datetime
+
+# Provider priority: dnse works best for price data, tcbs for fundamentals
+_PRICE_PROVIDERS = ['dnse', 'tcbs', 'ssi']
+_FUNDAMENTAL_PROVIDERS = ['tcbs', 'ssi']
 
 
 def _get_vietfin():
@@ -20,6 +32,23 @@ def _get_vietfin():
         )
 
 
+def _vfobject_to_df(result):
+    """Convert a VfObject result to a pandas DataFrame."""
+    if result is None:
+        return None
+
+    import pandas as pd
+
+    if hasattr(result, 'to_df'):
+        return result.to_df()
+    elif hasattr(result, 'results') and result.results:
+        return pd.DataFrame([
+            vars(r) if hasattr(r, '__dict__') else r
+            for r in result.results
+        ])
+    return None
+
+
 def get_stock_data(
     symbol: Annotated[str, "ticker symbol of the company (e.g., 'FPT', 'VNM')"],
     start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
@@ -28,30 +57,49 @@ def get_stock_data(
     """Get historical stock data for a HOSE ticker via vietfin."""
     try:
         vf = _get_vietfin()
-        result = vf.equity.historical(symbol=symbol.lower(), start=start_date, end=end_date)
 
-        if result is None:
+        # Try each price provider until one works
+        last_error = None
+        used_provider = None
+        for provider in _PRICE_PROVIDERS:
+            try:
+                result = vf.equity.price.historical(
+                    symbol=symbol.lower(),
+                    start_date=start_date,
+                    end_date=end_date,
+                    interval='1d',
+                    provider=provider,
+                )
+                data = _vfobject_to_df(result)
+                if data is not None and not data.empty:
+                    used_provider = provider
+                    break
+            except Exception as e:
+                last_error = e
+                continue
+        else:
+            if last_error:
+                return f"Error retrieving stock data for {symbol} via vietfin: {str(last_error)}"
             return (
                 f"No data found for symbol '{symbol}' via vietfin "
                 f"between {start_date} and {end_date}"
             )
 
-        # vietfin returns OBBject with .to_df() or similar
-        if hasattr(result, 'to_df'):
-            data = result.to_df()
-        elif hasattr(result, 'results') and result.results:
-            import pandas as pd
-            data = pd.DataFrame([vars(r) if hasattr(r, '__dict__') else r for r in result.results])
-        else:
-            return f"No data found for symbol '{symbol}' via vietfin"
+        # Normalize column names for consistency
+        col_map = {'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}
+        data = data.rename(columns={k: v for k, v in col_map.items() if k in data.columns})
 
-        if data.empty:
-            return f"No data found for symbol '{symbol}' via vietfin"
+        # dnse returns prices in VND (e.g., 119890), normalize to thousands if >1000
+        # to align with vnstock which returns prices like 119.89
+        price_cols = ['Open', 'High', 'Low', 'Close']
+        for col in price_cols:
+            if col in data.columns and data[col].mean() > 1000:
+                data[col] = (data[col] / 1000).round(2)
 
-        csv_string = data.to_csv(index=False)
+        csv_string = data.to_csv(index=True if data.index.name else False)
 
         header = f"# Stock data for {symbol.upper()} from {start_date} to {end_date}\n"
-        header += f"# Source: vietfin\n"
+        header += f"# Source: vietfin ({used_provider})\n"
         header += f"# Currency: VND\n"
         header += f"# Total records: {len(data)}\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
@@ -72,14 +120,6 @@ def get_fundamentals(
     try:
         vf = _get_vietfin()
 
-        # Fetch profile and ratios
-        profile = vf.equity.profile(symbol=ticker.lower())
-        ratios = None
-        try:
-            ratios = vf.equity.fundamental.ratios(symbol=ticker.lower())
-        except Exception:
-            pass  # Ratios may not be available
-
         header = f"# Company Fundamentals for {ticker.upper()}\n"
         header += f"# Source: vietfin\n"
         header += f"# Currency: VND\n"
@@ -87,34 +127,41 @@ def get_fundamentals(
 
         lines = []
 
-        # Extract profile data
-        if profile is not None:
-            if hasattr(profile, 'to_df'):
-                df = profile.to_df()
-                if not df.empty:
+        # Fetch profile (try each provider)
+        for provider in _FUNDAMENTAL_PROVIDERS:
+            try:
+                profile = vf.equity.profile(symbol=ticker.lower(), provider=provider)
+                df = _vfobject_to_df(profile)
+                if df is not None and not df.empty:
+                    lines.append(f"--- Company Profile (via {provider}) ---")
                     for col in df.columns:
                         val = df[col].iloc[0] if len(df) > 0 else None
                         if val is not None and str(val).strip():
                             lines.append(f"{col}: {val}")
-            elif hasattr(profile, 'results') and profile.results:
-                for item in profile.results:
-                    if hasattr(item, '__dict__'):
-                        for key, val in vars(item).items():
-                            if val is not None and str(val).strip():
-                                lines.append(f"{key}: {val}")
-
-        # Extract ratios data
-        if ratios is not None:
-            lines.append("\n--- Financial Ratios ---")
-            if hasattr(ratios, 'to_df'):
-                df = ratios.to_df()
-                if not df.empty:
-                    for col in df.columns:
-                        val = df[col].iloc[0] if len(df) > 0 else None
-                        if val is not None and str(val).strip():
-                            lines.append(f"{col}: {val}")
-
+                    break
+            except Exception:
+                continue
         if not lines:
+            lines.append("Profile: unavailable (all providers failed)")
+
+        # Fetch ratios (try each provider)
+        for provider in _FUNDAMENTAL_PROVIDERS:
+            try:
+                ratios = vf.equity.fundamental.ratios(
+                    symbol=ticker.lower(), period='annual', provider=provider
+                )
+                df = _vfobject_to_df(ratios)
+                if df is not None and not df.empty:
+                    lines.append(f"\n--- Financial Ratios (via {provider}) ---")
+                    for col in df.columns:
+                        val = df[col].iloc[0] if len(df) > 0 else None
+                        if val is not None and str(val).strip():
+                            lines.append(f"{col}: {val}")
+                    break
+            except Exception:
+                continue
+
+        if not lines or all('unavailable' in l for l in lines):
             return f"No fundamentals data found for symbol '{ticker}' via vietfin"
 
         return header + "\n".join(lines)
@@ -133,26 +180,19 @@ def get_income_statement(
     """Get income statement data via vietfin."""
     try:
         vf = _get_vietfin()
-        result = vf.equity.fundamental.income(symbol=ticker.lower())
+        period = 'quarter' if freq.lower() == 'quarterly' else 'annual'
+        result = vf.equity.fundamental.income(
+            symbol=ticker.lower(), period=period, provider='tcbs'
+        )
 
-        if result is None:
-            return f"No income statement data found for symbol '{ticker}' via vietfin"
-
-        if hasattr(result, 'to_df'):
-            data = result.to_df()
-        elif hasattr(result, 'results') and result.results:
-            import pandas as pd
-            data = pd.DataFrame([vars(r) if hasattr(r, '__dict__') else r for r in result.results])
-        else:
-            return f"No income statement data found for symbol '{ticker}' via vietfin"
-
-        if data.empty:
+        data = _vfobject_to_df(result)
+        if data is None or data.empty:
             return f"No income statement data found for symbol '{ticker}' via vietfin"
 
         csv_string = data.to_csv(index=False)
 
         header = f"# Income Statement data for {ticker.upper()} ({freq})\n"
-        header += f"# Source: vietfin\n"
+        header += f"# Source: vietfin (tcbs)\n"
         header += f"# Currency: VND\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
@@ -169,13 +209,31 @@ def get_balance_sheet(
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
     curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None,
 ) -> str:
-    """Balance sheet not available via vietfin."""
-    return (
-        f"# Balance Sheet data for {ticker.upper()}\n"
-        f"# Source: vietfin\n\n"
-        f"Balance sheet data is not available via vietfin. "
-        f"Use vnstock as the primary data source for balance sheet data."
-    )
+    """Get balance sheet data via vietfin."""
+    try:
+        vf = _get_vietfin()
+        period = 'quarter' if freq.lower() == 'quarterly' else 'annual'
+        result = vf.equity.fundamental.balance(
+            symbol=ticker.lower(), period=period, provider='tcbs'
+        )
+
+        data = _vfobject_to_df(result)
+        if data is None or data.empty:
+            return f"No balance sheet data found for symbol '{ticker}' via vietfin"
+
+        csv_string = data.to_csv(index=False)
+
+        header = f"# Balance Sheet data for {ticker.upper()} ({freq})\n"
+        header += f"# Source: vietfin (tcbs)\n"
+        header += f"# Currency: VND\n"
+        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+
+        return header + csv_string
+
+    except ImportError:
+        raise
+    except Exception as e:
+        return f"Error retrieving balance sheet for {ticker} via vietfin: {str(e)}"
 
 
 def get_cashflow(
@@ -183,13 +241,31 @@ def get_cashflow(
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
     curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None,
 ) -> str:
-    """Cash flow data not available via vietfin."""
-    return (
-        f"# Cash Flow data for {ticker.upper()}\n"
-        f"# Source: vietfin\n\n"
-        f"Cash flow data is not available via vietfin. "
-        f"Use vnstock as the primary data source for cash flow data."
-    )
+    """Get cash flow data via vietfin."""
+    try:
+        vf = _get_vietfin()
+        period = 'quarter' if freq.lower() == 'quarterly' else 'annual'
+        result = vf.equity.fundamental.cash(
+            symbol=ticker.lower(), period=period, provider='tcbs'
+        )
+
+        data = _vfobject_to_df(result)
+        if data is None or data.empty:
+            return f"No cash flow data found for symbol '{ticker}' via vietfin"
+
+        csv_string = data.to_csv(index=False)
+
+        header = f"# Cash Flow data for {ticker.upper()} ({freq})\n"
+        header += f"# Source: vietfin (tcbs)\n"
+        header += f"# Currency: VND\n"
+        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+
+        return header + csv_string
+
+    except ImportError:
+        raise
+    except Exception as e:
+        return f"Error retrieving cash flow for {ticker} via vietfin: {str(e)}"
 
 
 def get_insider_transactions(
