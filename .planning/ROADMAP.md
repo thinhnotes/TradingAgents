@@ -123,5 +123,27 @@ Phase 1 (Config) ──► Phase 2 (VN Data) ──► Phase 3 (Source Monitor)
 **Parallel opportunities:** Phase 4 can run in parallel with Phases 2-3 (only depends on Phase 1).
 
 ---
+
+## Backlog
+
+### Phase 999.1: Custom LLM Provider URL and Model Support (BACKLOG)
+
+**Goal:** Allow users to connect to any OpenAI-compatible API endpoint (e.g., cliproxyapi, LiteLLM proxy, vLLM, LocalAI) by specifying a custom base URL and arbitrary model name. Currently the system expects specific provider keys and model names from a fixed catalog — this limits users who run their own proxy or use third-party API aggregators.
+
+**Context:**
+- User needs to connect to `cliproxyapi` — an OpenAI-compatible proxy
+- Current `backend_url` config exists but is tightly coupled to provider selection
+- `model_catalog.py` restricts model choices to a known list per provider
+- Should support: custom base URL + custom model name + optional custom API key
+- CLI should offer "Custom / Other" as a provider option
+
+**Requirements:** TBD
+
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
+
+---
 *Roadmap created: 2026-03-31*
-*Last updated: 2026-03-31 after initial creation*
+*Last updated: 2026-04-01 after backlog addition*
