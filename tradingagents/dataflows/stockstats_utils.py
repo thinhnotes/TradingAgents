@@ -61,24 +61,42 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
     end_str = today_date.strftime("%Y-%m-%d")
 
     os.makedirs(config["data_cache_dir"], exist_ok=True)
+    # Use a more generic cache filename
     data_file = os.path.join(
         config["data_cache_dir"],
-        f"{symbol}-YFin-data-{start_str}-{end_str}.csv",
+        f"{symbol}-ohlcv-{start_str}-{end_str}.csv",
     )
 
     if os.path.exists(data_file):
-        data = pd.read_csv(data_file, on_bad_lines="skip")
+        data = pd.read_csv(data_file, comment="#", on_bad_lines="skip")
     else:
-        data = yf_retry(lambda: yf.download(
-            symbol,
-            start=start_str,
-            end=end_str,
-            multi_level_index=False,
-            progress=False,
-            auto_adjust=True,
-        ))
-        data = data.reset_index()
-        data.to_csv(data_file, index=False)
+        # Use market-aware download via interface (avoid circular import)
+        import io
+        from tradingagents.dataflows.interface import route_to_vendor
+        
+        try:
+            csv_data = route_to_vendor("get_stock_data", symbol, start_str, end_str)
+
+            if not csv_data or "Error" in csv_data or "No data found" in csv_data:
+                logger.error(f"Failed to load data for {symbol}: {csv_data}")
+                return pd.DataFrame()
+            
+            # Strip comments/headers from the string
+            lines = csv_data.splitlines()
+            csv_lines = [l for l in lines if l.strip() and not l.startswith("#")]
+            csv_content = "\n".join(csv_lines)
+            
+            if not csv_content.strip():
+                logger.error(f"Empty CSV content for {symbol}")
+                return pd.DataFrame()
+
+            data = pd.read_csv(io.StringIO(csv_content))
+            # Save to cache without headers for easier reading later
+            data.to_csv(data_file, index=False)
+        except Exception as e:
+            logger.error(f"Exception fetching data for {symbol}: {e}")
+            return pd.DataFrame()
+
 
     data = _clean_dataframe(data)
 

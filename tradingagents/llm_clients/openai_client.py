@@ -76,9 +76,13 @@ class OpenAIClient(BaseLLMClient):
             if api_key_env:
                 api_key = os.environ.get(api_key_env)
                 if api_key:
-                    llm_kwargs["api_key"] = api_key
+                    llm_kwargs["openai_api_key"] = api_key
             else:
-                llm_kwargs["api_key"] = "ollama"
+                llm_kwargs["openai_api_key"] = "ollama"
+
+            # Force streaming for custom provider to avoid proxy buffering/timeout issues
+            if self.provider == "custom":
+                llm_kwargs["streaming"] = True
         elif self.base_url:
             llm_kwargs["base_url"] = self.base_url
 

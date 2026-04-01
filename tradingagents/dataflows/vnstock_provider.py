@@ -6,6 +6,8 @@ vnstock is imported lazily — system won't break if not installed.
 
 from typing import Annotated
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
+import pandas as pd
 
 
 def _get_vnstock():
@@ -88,10 +90,26 @@ def get_fundamentals(
         header += f"# Currency: VND\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
+        # Standardize keys for agent compatibility (match yfinance where possible)
+        key_map = {
+            'market_cap': 'Market Cap',
+            'pe': 'PE Ratio (TTM)',
+            'pb': 'Price to Book',
+            'dividend_yield': 'Dividend Yield',
+            'industry': 'Industry',
+            'revenue_ttm': 'Revenue (TTM)',
+            'profit_ttm': 'Net Income',
+            'eps_ttm': 'EPS (TTM)',
+            'beta': 'Beta',
+            'outstanding_shares': 'Shares Outstanding',
+            'high_52w': '52 Week High',
+            'low_52w': '52 Week Low',
+        }
+
         if hasattr(overview, 'to_dict'):
             # DataFrame — convert first row to dict
-            if hasattr(overview, 'iloc'):
-                info = overview.iloc[0].to_dict() if len(overview) > 0 else {}
+            if hasattr(overview, 'iloc') and len(overview) > 0:
+                info = overview.iloc[0].to_dict()
             else:
                 info = overview.to_dict()
         elif isinstance(overview, dict):
@@ -100,11 +118,20 @@ def get_fundamentals(
             return header + str(overview)
 
         lines = []
+        processed_keys = set()
+        for vn_key, display_name in key_map.items():
+            if vn_key in info:
+                val = info[vn_key]
+                if val is not None:
+                    lines.append(f"{display_name}: {val}")
+                processed_keys.add(vn_key)
+        
         for key, value in info.items():
-            if value is not None and str(value).strip():
+            if key not in processed_keys and value is not None and str(value).strip():
                 lines.append(f"{key}: {value}")
 
         return header + "\n".join(lines)
+
 
     except ImportError:
         raise
@@ -216,25 +243,80 @@ def get_insider_transactions(
 
 def get_news(
     ticker: Annotated[str, "ticker symbol"],
-    curr_date: Annotated[str, "current date"] = None,
-    look_back_days: Annotated[int, "days to look back"] = 7,
+    start_date: Annotated[str, "start date in yyyy-mm-dd"],
+    end_date: Annotated[str, "end date in yyyy-mm-dd"],
 ) -> str:
-    """Stub: Vietnamese news integration planned for Phase 5."""
-    return (
-        f"# News for {ticker.upper()}\n"
-        f"# Source: vnstock\n\n"
-        f"Vietnamese financial news integration is planned for Phase 5. "
-        f"Currently, news data is not available for HOSE tickers through this provider."
-    )
+    """Retrieve news for a HOSE ticker via vnstock, filtered by date range."""
+    try:
+        Vnstock = _get_vnstock()
+        stock = Vnstock().stock(symbol=ticker.upper(), source='VCI')
+        news = stock.company.news()
+
+        if news is None or (hasattr(news, 'empty') and news.empty):
+            return f"No news found for symbol '{ticker}'"
+
+        # Calculate date range for filtering
+        # Multi-index or complex column names check
+        if isinstance(news.columns, pd.MultiIndex):
+            news.columns = news.columns.get_level_values(-1)
+
+        # Parse date range for filtering
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+
+        news_str = ""
+        count = 0
+
+        # Mapping: news_title, public_date, news_short_content
+        for _, row in news.iterrows():
+            pub_date_str = str(row.get('public_date', ''))
+            pub_date = None
+            if pub_date_str:
+                try:
+                    # Clean up date format if needed
+                    pub_date = datetime.fromisoformat(pub_date_str.split(' ')[0])
+                except Exception:
+                    pass
+
+            # Filter by date
+            if pub_date and not (start_dt <= pub_date <= end_dt + relativedelta(days=1)):
+                continue
+
+            title = row.get('news_title', 'No Title')
+            content = row.get('news_short_content', '')
+            link = row.get('news_source_link', '')
+
+            news_str += f"### {title}\n"
+            if content:
+                news_str += f"{content}\n"
+            if link:
+                news_str += f"Link: {link}\n"
+            news_str += "\n"
+            count += 1
+            if count >= 10:  # Limit to 10 articles
+                break
+
+        if count == 0:
+            return f"No news found for {ticker.upper()} between {start_date} and {end_date}."
+
+        header = f"## {ticker.upper()} News, from {start_date} to {end_date}:\n"
+        header += f"# Source: vnstock (VCI)\n\n"
+
+        return header + news_str
+
+    except ImportError:
+        raise
+    except Exception as e:
+        return f"Error retrieving news for {ticker} via vnstock: {str(e)}"
 
 
 def get_global_news() -> str:
-    """Stub: Vietnamese global news integration planned for Phase 5."""
+    """Retrieve global/macro news for VN market (Placeholder for VNIndex context)."""
     return (
         "# Vietnamese Market Global News\n"
         "# Source: vnstock\n\n"
-        "Vietnamese global market news integration is planned for Phase 5. "
-        "Currently, global news for the Vietnamese market is not available."
+        "Global market news for Vietnam is currently summarized through VNIndex analysis. "
+        "Specific macro news headlines are scheduled for full integration in Phase 5."
     )
 
 
@@ -277,6 +359,21 @@ def get_vnindex_data(
         raise
     except Exception as e:
         return f"Error retrieving VNIndex data via vnstock: {str(e)}"
+
+
+def get_global_news(
+    curr_date: Annotated[str, "current date in yyyy-mm-dd format"],
+    look_back_days: Annotated[int, "number of days to look back"] = 7,
+    limit: Annotated[int, "maximum number of articles to return"] = 5,
+) -> str:
+    """Stub: Global news not directly available via vnstock."""
+    start_dt = datetime.strptime(curr_date, "%Y-%m-%d") - relativedelta(days=look_back_days)
+    start_date = start_dt.strftime("%Y-%m-%d")
+    return (
+        f"## Global Market News, from {start_date} to {curr_date}:\n\n"
+        f"Global macro news is not available via vnstock provider. "
+        f"Falling back to US market data tools for global sentiment."
+    )
 
 
 def get_available_tickers() -> list:

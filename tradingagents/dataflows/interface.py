@@ -11,6 +11,7 @@ from .y_finance import (
     get_insider_transactions as get_yfinance_insider_transactions,
 )
 from .yfinance_news import get_news_yfinance, get_global_news_yfinance
+from .y_finance import get_stock_stats_indicators_window as get_yfinance_indicators
 from .alpha_vantage import (
     get_stock as get_alpha_vantage_stock,
     get_indicator as get_alpha_vantage_indicator,
@@ -109,7 +110,9 @@ VENDOR_METHODS = {
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
-        "yfinance": get_stock_stats_indicators_window,
+        "yfinance": get_yfinance_indicators,
+        "vnstock": get_yfinance_indicators,  # Also uses stockstats wrapper
+        "vietfin": get_yfinance_indicators,  # Also uses stockstats wrapper
     },
     # fundamental_data
     "get_fundamentals": {

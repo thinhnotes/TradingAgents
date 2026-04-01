@@ -281,8 +281,8 @@ def get_insider_transactions(
 
 def get_news(
     ticker: Annotated[str, "ticker symbol"],
-    curr_date: Annotated[str, "current date"] = None,
-    look_back_days: Annotated[int, "days to look back"] = 7,
+    start_date: Annotated[str, "start date in yyyy-mm-dd"],
+    end_date: Annotated[str, "end date in yyyy-mm-dd"],
 ) -> str:
     """Stub: Vietnamese news not available via vietfin."""
     return (
@@ -293,7 +293,11 @@ def get_news(
     )
 
 
-def get_global_news() -> str:
+def get_global_news(
+    curr_date: Annotated[str, "current date in yyyy-mm-dd format"],
+    look_back_days: Annotated[int, "number of days to look back"] = 7,
+    limit: Annotated[int, "maximum number of articles to return"] = 5,
+) -> str:
     """Stub: Global news not available via vietfin."""
     return (
         "# Vietnamese Market Global News\n"

@@ -1,4 +1,8 @@
-from tradingagents.agents.utils.agent_utils import build_instrument_context, get_language_instruction
+from tradingagents.agents.utils.agent_utils import (
+    build_instrument_context,
+    get_language_instruction,
+    get_localized_headers,
+)
 
 
 def create_portfolio_manager(llm, memory):
@@ -21,13 +25,16 @@ def create_portfolio_manager(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""As the Portfolio Manager, synthesize the risk analysts' debate and deliver the final trading decision.
+        headers = get_localized_headers()
+
+        prompt = f"""{get_language_instruction()}
+As the Portfolio Manager, synthesize the risk analysts' debate and deliver the final trading decision.
 
 {instrument_context}
 
 ---
 
-**Rating Scale** (use exactly one):
+**{headers['rating']} Scale** (use exactly one):
 - **Buy**: Strong conviction to enter or add to position
 - **Overweight**: Favorable outlook, gradually increase exposure
 - **Hold**: Maintain current position, no action needed
@@ -38,10 +45,19 @@ def create_portfolio_manager(llm, memory):
 - Trader's proposed plan: **{trader_plan}**
 - Lessons from past decisions: **{past_memory_str}**
 
-**Required Output Structure:**
-1. **Rating**: State one of Buy / Overweight / Hold / Underweight / Sell.
-2. **Executive Summary**: A concise action plan covering entry strategy, position sizing, key risk levels, and time horizon.
-3. **Investment Thesis**: Detailed reasoning anchored in the analysts' debate and past reflections.
+**MANDATORY Output Structure (DO NOT SKIP ANY SECTION):**
+1. **{headers['rating']}**: State one of Buy / Overweight / Hold / Underweight / Sell.
+2. **{headers['exec_summary']}**: A concise action plan including:
+    - **{headers['buy_range']}** (e.g., 115.0 - 118.0 VND)
+    - **{headers['tp']}**
+    - **{headers['sl']}**
+    - **{headers['time_horizon']}** (e.g., 2-4 weeks)
+    - **{headers['sizing']}**
+3. **{headers['market_outlook']}** (Provide specific analysis for each):
+    - **{headers['st']}**: Based on 10 EMA, recent news, and sentiment.
+    - **{headers['mt']}**: Based on 50 SMA, fundamentals, and quarterly trends.
+    - **{headers['lt']}**: Based on 200 SMA, core business value, and macro-economic factors.
+4. **{headers['thesis']}**: Detailed reasoning anchored in the analysts' debate and past reflections.
 
 ---
 
@@ -50,7 +66,7 @@ def create_portfolio_manager(llm, memory):
 
 ---
 
-Be decisive and ground every conclusion in specific evidence from the analysts.{get_language_instruction()}"""
+Be decisive, follow the structure exactly, and ground every conclusion in specific evidence from the analysts."""
 
         response = llm.invoke(prompt)
 
