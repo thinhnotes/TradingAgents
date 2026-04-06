@@ -6,6 +6,8 @@ import json
 from datetime import date
 from typing import Dict, Any, Tuple, List, Optional
 
+import httpx
+
 from langgraph.prebuilt import ToolNode
 
 from tradingagents.llm_clients import create_llm_client
@@ -152,6 +154,14 @@ class TradingAgentsGraph:
             effort = self.config.get("anthropic_effort")
             if effort:
                 kwargs["effort"] = effort
+
+        if provider == "custom":
+            custom_headers = self.config.get("custom_llm_headers")
+            if custom_headers:
+                if "http_client" not in kwargs:
+                    kwargs["http_client"] = httpx.Client(headers=custom_headers)
+                if "http_async_client" not in kwargs:
+                    kwargs["http_async_client"] = httpx.AsyncClient(headers=custom_headers)
 
         return kwargs
 

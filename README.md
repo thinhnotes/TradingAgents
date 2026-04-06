@@ -138,6 +138,14 @@ Alternatively, copy `.env.example` to `.env` and fill in your keys:
 cp .env.example .env
 ```
 
+Optional config overrides (uppercase env vars):
+```bash
+export TRADINGAGENTS_DEEP_THINK_LLM=gpt-5-mini
+export TRADINGAGENTS_QUICK_THINK_LLM=gpt-5-mini
+export TRADINGAGENTS_MAX_DEBATE_ROUNDS=1
+export TRADINGAGENTS_CUSTOM_LLM_HEADERS='{"X-API-KEY":"your-key","X-ORG":"demo"}'
+```
+
 ### CLI Usage
 
 Launch the interactive CLI:

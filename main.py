@@ -1,6 +1,7 @@
 import sys
 import os
 import io
+import json
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
@@ -26,9 +27,25 @@ if custom_url:
     config["llm_provider"] = "custom"
     config["backend_url"] = custom_url
 
-config["deep_think_llm"] = "gpt-5-mini"
-config["quick_think_llm"] = "gpt-5-mini"
-config["max_debate_rounds"] = 1
+config["deep_think_llm"] = os.getenv(
+    "TRADINGAGENTS_DEEP_THINK_LLM",
+    config["deep_think_llm"],
+)
+config["quick_think_llm"] = os.getenv(
+    "TRADINGAGENTS_QUICK_THINK_LLM",
+    config["quick_think_llm"],
+)
+max_debate_env = os.getenv("TRADINGAGENTS_MAX_DEBATE_ROUNDS")
+if max_debate_env is not None:
+    config["max_debate_rounds"] = int(max_debate_env)
+custom_headers_env = os.getenv("TRADINGAGENTS_CUSTOM_LLM_HEADERS")
+if custom_headers_env:
+    try:
+        config["custom_llm_headers"] = json.loads(custom_headers_env)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "TRADINGAGENTS_CUSTOM_LLM_HEADERS must be valid JSON."
+        ) from exc
 
 # Configure for Vietnamese market
 config["market"] = "VN"
